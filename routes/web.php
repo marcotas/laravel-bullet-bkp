@@ -17,4 +17,8 @@ Route::get('/', function () {
 
 Auth::routes();
 
+Route::middleware('auth')->group(function () {
+    Bullet::controllers('Http/Controllers/Bullet');
+});
+
 Route::get('/home', 'HomeController@index')->name('home');
