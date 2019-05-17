@@ -1,9 +1,10 @@
 <?php
 
 /** @var \Illuminate\Database\Eloquent\Factory $factory */
-use App\User;
+use App\Models\User;
 use Illuminate\Support\Str;
 use Faker\Generator as Faker;
+use Illuminate\Support\Arr;
 
 /*
 |--------------------------------------------------------------------------
@@ -17,10 +18,12 @@ use Faker\Generator as Faker;
 */
 
 $factory->define(User::class, function (Faker $faker) {
+    $gender = Arr::random(['male', 'female']);
     return [
-        'name' => $faker->name,
+        'name' => $faker->name($gender),
         'email' => $faker->unique()->safeEmail,
-        'email_verified_at' => now(),
+        'email_verified_at' => Arr::random([null, now()]),
+        'gender' => $gender,
         'password' => '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', // password
         'remember_token' => Str::random(10),
     ];

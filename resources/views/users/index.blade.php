@@ -2,6 +2,6 @@
 
 @section('content')
 <div class="container">
-    <users-list></users-list>
+    <users-list :initial="{{ json_encode($users) }}"></users-list>
 </div>
 @endsection
