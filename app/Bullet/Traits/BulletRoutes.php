@@ -2,10 +2,10 @@
 
 namespace App\Bullet\Traits;
 
+use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
-use Illuminate\Http\Request;
 
 trait BulletRoutes
 {
@@ -27,7 +27,7 @@ trait BulletRoutes
 
     private function getControllers(): Collection
     {
-        $dirs = new \IteratorIterator(new \DirectoryIterator(app_path('Http/Controllers/' . $this->namespace)));
+        $dirs  = new \IteratorIterator(new \DirectoryIterator(app_path('Http/Controllers/' . $this->namespace)));
         $files = collect();
         foreach ($dirs as $file) {
             if ($file->isDir() || $file->getBasename() === 'Controller.php') {
@@ -35,6 +35,7 @@ trait BulletRoutes
             }
             $files->push(str_replace('.php', '', $file->getBasename()));
         }
+
         return $files->filter(function ($controller) {
             return class_exists($this->getNamespaced($controller));
         });
@@ -43,6 +44,7 @@ trait BulletRoutes
     private function getNamespaced($controller)
     {
         $namespace = str_replace('/', '\\', $this->namespace);
+
         return str_replace('\\\\', '\\', Str::studly('App\\Http\\Controllers\\' . $namespace . '\\' . $controller));
     }
 
@@ -73,10 +75,10 @@ trait BulletRoutes
             $controller = $this->getNamespacedForRoute($controllerName);
             foreach ($methods as $method) {
                 $httpMethod = $this->inferHttpMethodFromMethodName($method);
-                $model = $this->getModelFromControllerName($controllerName);
-                $url = $this->getRouteOf($controllerName, $model, $method);
-                $route = Str::plural(Str::kebab($model));
-                $routeName = Str::kebab($method);
+                $model      = $this->getModelFromControllerName($controllerName);
+                $url        = $this->getRouteOf($controllerName, $model, $method);
+                $route      = Str::plural(Str::kebab($model));
+                $routeName  = Str::kebab($method);
 
                 Route::{$httpMethod}("$url", "$controller@$method")->name("$route.$routeName");
             }
@@ -85,11 +87,11 @@ trait BulletRoutes
 
     private function getRouteOf(string $controller, string $model, string $method)
     {
-        $modelSlug = Str::kebab($model);
+        $modelSlug             = Str::kebab($model);
         $modelInVariableFormat = Str::camel($modelSlug);
-        $defaultRoute = Str::plural($modelSlug);
-        $methodSlug = Str::kebab($this->sanitizeMethodName($method));
-        $urlParams = $this->getMethodParametersOf($controller, $method)->map(function (\ReflectionParameter $param) {
+        $defaultRoute          = Str::plural($modelSlug);
+        $methodSlug            = Str::kebab($this->sanitizeMethodName($method));
+        $urlParams             = $this->getMethodParametersOf($controller, $method)->map(function (\ReflectionParameter $param) {
             return '{' . $param->getName() . '}';
         })->join('/');
 
@@ -99,7 +101,11 @@ trait BulletRoutes
             case 'update':
             case 'show':
             case 'destroy':
-                return "$defaultRoute/{" . $modelInVariableFormat . "}";
+                return "$defaultRoute/{" . $modelInVariableFormat . '}';
+            case 'forceDelete':
+                return "$defaultRoute/{" . $modelInVariableFormat . '}/force-delete';
+            case 'restore':
+                return "$defaultRoute/{" . $modelInVariableFormat . '}/restore';
             case 'store':
                 return "$defaultRoute";
             default:
@@ -110,7 +116,8 @@ trait BulletRoutes
     private function getMethodParametersOf(string $controller, string $method): Collection
     {
         $controller = $this->getNamespaced($controller);
-        $ref = new \ReflectionClass($controller);
+        $ref        = new \ReflectionClass($controller);
+
         return collect($ref->getMethod($method)->getParameters())->filter(function (\ReflectionParameter $param) {
             if (!$param->hasType() || $param->getClass() === null) {
                 return $param;
@@ -136,7 +143,7 @@ trait BulletRoutes
 
     private function inferHttpMethodFromMethodName(string $method)
     {
-        $resourceMethods = collect(['index', 'store', 'update', 'show', 'destroy']);
+        $resourceMethods = collect(['index', 'store', 'update', 'show', 'destroy', 'forceDelete', 'restore']);
 
         if ($resourceMethods->contains($method)) {
             return $this->getResourceHttpMethodFrom($method);
@@ -164,10 +171,12 @@ trait BulletRoutes
             case 'store':
                 return 'post';
             case 'update':
+            case 'restore':
                 return 'put';
             case 'show':
                 return 'get';
             case 'destroy':
+            case 'forceDelete':
                 return 'delete';
         }
         throw new \LogicException('There is no http method defined for the resource method "' . $method . '"');
@@ -176,6 +185,7 @@ trait BulletRoutes
     private function getModelFromControllerName(string $controller)
     {
         list($controller) = explode('-', Str::kebab($controller));
+
         return Str::studly($controller);
     }
 }

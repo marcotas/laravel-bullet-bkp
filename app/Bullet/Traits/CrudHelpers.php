@@ -5,6 +5,8 @@ namespace App\Bullet\Traits;
 use App\Bullet\Exceptions\ModelNotFoundException;
 use App\Bullet\Resources\DataResource;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
@@ -18,22 +20,48 @@ trait CrudHelpers
     protected function getModel()
     {
         $controller = class_basename(get_called_class());
-        $model = $this->model ?? Str::singular(str_replace('Controller', '', $controller));
+        $model      = $this->model ?? Str::singular(str_replace('Controller', '', $controller));
 
         if (class_exists($model)) {
             return $this->model = $model;
-        } elseif (class_exists('App\\Models\\' . $model)) {
-            return $this->model = 'App\\Models\\' . $model;
-        } elseif (class_exists('App\\' . $model)) {
-            return $this->model = 'App\\' . $model;
-        } else {
-            throw new ModelNotFoundException("Model $model not found for controller $controller");
         }
+        if (class_exists('App\\Models\\' . $model)) {
+            return $this->model = 'App\\Models\\' . $model;
+        }
+        if (class_exists('App\\' . $model)) {
+            return $this->model = 'App\\' . $model;
+        }
+        throw new ModelNotFoundException("Model $model not found for controller $controller");
     }
 
     protected function getQuery(): Builder
     {
         return $this->getModel()::query();
+    }
+
+    protected function getFilteredQuery($request)
+    {
+        $query = $this->getQuery();
+
+        if (class_exists('Spatie\QueryBuilder\QueryBuilder')) {
+            $query = \Spatie\QueryBuilder\QueryBuilder::for($query)
+                ->defaultSorts($this->defaultSorts())
+                ->allowedFilters($this->allowedFilters())
+                ->allowedIncludes($this->allowedIncludes())
+                ->allowedSorts($this->allowedSorts())
+                ->allowedFields($this->allowedFields())
+                ->allowedAppends($this->allowedAppends());
+        }
+
+        return $query;
+    }
+
+    protected function hasMethod($method)
+    {
+        $model = $this->getModel();
+        $model = new $model();
+
+        return method_exists($model, $method);
     }
 
     protected function getModelUrl()
@@ -64,14 +92,52 @@ trait CrudHelpers
 
     protected function getModelPolicy()
     {
-        dd('policy');
+        $model = class_basename($this->getModel());
+
+        return "App\\Policies\\{$model}Policy";
     }
 
     protected function getModelColumns()
     {
         $modelClass = $this->getModel();
-        $model = new $modelClass();
+        $model      = new $modelClass();
 
         return $this->modelColumns = $this->modelColumns ?? Schema::getColumnListing($model->getTable());
+    }
+
+    protected function resolveRequestForAction($action)
+    {
+        $action            = ucfirst($action);
+        $model             = class_basename($this->getModel());
+        $modelPlural       = Str::plural($model);
+        $requestsNamespace = 'App\\Http\\Requests';
+
+        if (isset($this->requests) && Arr::has($this->requests, strtolower($action))) {
+            $actionName = strtolower($action);
+
+            return resolve($this->requests[$actionName]);
+        }
+
+        if (class_exists("$requestsNamespace\\{$modelPlural}\\{$action}Request")) {
+            return resolve("$requestsNamespace\\{$modelPlural}\\{$action}Request");
+        }
+
+        if (class_exists("$requestsNamespace\\{$model}{$action}Request")) {
+            return resolve("$requestsNamespace\\{$model}{$action}Request");
+        }
+
+        return resolve(Request::class);
+    }
+
+    protected function authorizeAction($action, $modelObject = null)
+    {
+        $ability = method_exists($this, 'resourceAbilityMap')
+            ? ($this->resourceAbilityMap()[$action] ?? $action)
+            : $action;
+        // dd('ability', $ability, $this->getModelPolicy());
+
+        if (class_exists($this->getModelPolicy()) && method_exists($this, 'authorize')) {
+            $this->authorize($ability, $modelObject ?? $this->getModel());
+        }
     }
 }

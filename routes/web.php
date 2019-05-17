@@ -19,8 +19,6 @@ Route::get('/', function () {
 
 Auth::routes(['verify' => true]);
 
-Bullet::controllers('Bullet');
-
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/home', 'HomeController@index')->name('home');
 });

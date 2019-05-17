@@ -9,20 +9,19 @@ trait IndexAction
 {
     use CrudHelpers;
 
-    protected $defaultSorts = null;
-    protected $allowedFilters = null;
+    protected $defaultSorts    = null;
+    protected $allowedFilters  = null;
     protected $allowedIncludes = null;
-    protected $allowedSorts = null;
-    protected $allowedFields = null;
-    protected $allowedAppends = null;
-    protected $defaultPerPage = 15;
-    protected $maxPerPage = 500;
-    protected $searchable = true;
+    protected $allowedSorts    = null;
+    protected $allowedFields   = null;
+    protected $allowedAppends  = null;
+    protected $defaultPerPage  = 15;
+    protected $maxPerPage      = 500;
+    protected $searchable      = true;
 
     public function index(Request $request)
     {
         $this->beforeIndex($request);
-        $this->authorizeIndex($request);
 
         $perPage = $request->per_page ?? $request->perPage ?? $this->defaultPerPage;
         $perPage = $perPage <= 0 ? 1 : $perPage;
@@ -52,21 +51,11 @@ trait IndexAction
         return $query;
     }
 
-    protected function getIndexQuery(Request $request): Builder
+    protected function getIndexQuery($request): Builder
     {
-        $query = $this->getQuery();
+        $query = $this->getFilteredQuery($request);
 
-        if (class_exists('Spatie\QueryBuilder\QueryBuilder')) {
-            $query = \Spatie\QueryBuilder\QueryBuilder::for($query)
-                ->defaultSorts($this->defaultSorts())
-                ->allowedFilters($this->allowedFilters())
-                ->allowedIncludes($this->allowedIncludes())
-                ->allowedSorts($this->allowedSorts())
-                ->allowedFields($this->allowedFields())
-                ->allowedAppends($this->allowedAppends());
-        }
-
-        if ($this->searchable) {
+        if ($this->searchable && $this->hasMethod('scopeSearch')) {
             $query->search($request->search);
         }
 
