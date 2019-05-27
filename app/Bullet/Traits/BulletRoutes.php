@@ -15,10 +15,12 @@ trait BulletRoutes
     ];
     protected $namespace;
     protected $httpMethods;
+    protected $controllerInstances = [];
 
     public function controllers(string $namespace = null)
     {
-        $this->namespace = $namespace ?? '';
+        $this->namespace           = $namespace ?? '';
+        $this->controllerInstances = [];
 
         $controllers = $this->mapMethods($this->getControllers());
 
@@ -71,31 +73,61 @@ trait BulletRoutes
 
     private function makeRoutes(Collection $controllers)
     {
-        foreach ($controllers as $controllerName => $methods) {
+        foreach ($controllers as $controllerName => $actions) {
             $controller = $this->getNamespacedForRoute($controllerName);
-            foreach ($methods as $method) {
-                $httpMethod = $this->inferHttpMethodFromMethodName($method);
-                $model      = $this->getModelFromControllerName($controllerName);
-                $url        = $this->getRouteOf($controllerName, $model, $method);
+            foreach ($actions as $action) {
+                $httpMethod = $this->inferHttpMethodFromActionName($action);
+                $model      = class_basename($this->getModelFromController($controllerName));
+                $url        = $this->getRouteOf($controllerName, $model, $action);
                 $route      = Str::plural(Str::kebab($model));
-                $routeName  = Str::kebab($method);
+                $routeName  = Str::kebab($action);
 
-                Route::{$httpMethod}("$url", "$controller@$method")->name("$route.$routeName");
+                if (!$this->shouldDisplayRoute($controllerName, $action)) {
+                    continue;
+                }
+
+                Route::{$httpMethod}("$url", "$controller@$action")->name("$route.$routeName");
             }
         }
     }
 
-    private function getRouteOf(string $controller, string $model, string $method)
+    private function shouldDisplayRoute($controller, $action)
+    {
+        $only                 = collect($this->getControllerPropValue($controller, 'only'));
+        $except               = collect($this->getControllerPropValue($controller, 'except'));
+        $implementsSoftDelete = false;
+        $softDeleteActions    = collect(['forceDelete', 'restore']);
+
+        if ($softDeleteActions->contains($action)) {
+            $model                = $this->getModelFromController($controller);
+            $modelObj             = new $model();
+            $implementsSoftDelete = method_exists($modelObj, 'initializeSoftDeletes');
+            // falta só resolver o soft deletes com only e except.
+        }
+
+        if ($only->isNotEmpty()) {
+            return $only->contains($action);
+        }
+
+        if ($except->isNotEmpty()) {
+            return !$except->contains($action);
+        }
+
+        return true;
+    }
+
+    private function getRouteOf(string $controller, string $model, string $action)
     {
         $modelSlug             = Str::kebab($model);
         $modelInVariableFormat = Str::camel($modelSlug);
         $defaultRoute          = Str::plural($modelSlug);
-        $methodSlug            = Str::kebab($this->sanitizeMethodName($method));
-        $urlParams             = $this->getMethodParametersOf($controller, $method)->map(function (\ReflectionParameter $param) {
-            return '{' . $param->getName() . '}';
-        })->join('/');
+        $methodSlug            = Str::kebab($this->sanitizeMethodName($action));
+        $urlParams             = $this->getMethodParametersOf($controller, $action)
+            ->map(function (\ReflectionParameter $param) {
+                return '{' . $param->getName() . '}';
+            })->join('/');
 
-        switch ($method) {
+        switch ($action) {
             case 'index':
                 return $defaultRoute;
             case 'update':
@@ -141,7 +173,7 @@ trait BulletRoutes
         return $sanitized;
     }
 
-    private function inferHttpMethodFromMethodName(string $method)
+    private function inferHttpMethodFromActionName(string $method)
     {
         $resourceMethods = collect(['index', 'store', 'update', 'show', 'destroy', 'forceDelete', 'restore']);
 
@@ -182,10 +214,43 @@ trait BulletRoutes
         throw new \LogicException('There is no http method defined for the resource method "' . $method . '"');
     }
 
-    private function getModelFromControllerName(string $controller)
+    private function getModelFromController(string $controller)
     {
+        $controllerInstance = $this->getControllerInstance($controller);
+        $reflection         = new \ReflectionObject($controllerInstance);
+        $modelProperty      = $reflection->getProperty('model');
+        $modelProperty->setAccessible(true);
+
+        // Infer model name from controller
         list($controller) = explode('-', Str::kebab($controller));
 
-        return Str::studly($controller);
+        return $modelProperty->getValue($controllerInstance) ?? 'App\\Models\\' . Str::studly($controller);
+    }
+
+    private function getControllerInstance($controller)
+    {
+        $controller = class_basename($controller);
+        $controller = $this->getNamespaced($controller);
+
+        return $this->controllerInstances[$controller] = $this->controllerInstances[$controller]
+            ?? $this->createControllerInstance($controller);
+    }
+
+    private function createControllerInstance($controller)
+    {
+        $controller      = class_basename($controller);
+        $controllerClass = $this->getNamespaced($controller);
+
+        return resolve($controllerClass);
+    }
+
+    private function getControllerPropValue($controller, $property)
+    {
+        $object     = $this->getControllerInstance($controller);
+        $reflection = new \ReflectionObject($object);
+        $prop       = $reflection->getProperty($property);
+        $prop->setAccessible(true);
+
+        return $prop->getValue($object);
     }
 }

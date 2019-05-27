@@ -13,4 +13,6 @@ trait CrudOperations
         RestoreAction;
 
     protected $model;
+    protected $only;
+    protected $except;
 }
