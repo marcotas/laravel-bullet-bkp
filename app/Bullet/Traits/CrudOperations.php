@@ -9,6 +9,7 @@ trait CrudOperations
         UpdateAction,
         DestroyAction,
         ShowAction,
+        EditAction,
         ForceDeleteAction,
         RestoreAction;
 

@@ -11,6 +11,7 @@
                 <table class="table table-hover mb-0">
                     <thead>
                         <tr>
+                            <th>ID</th>
                             <th>Nome</th>
                             <th>Email</th>
                             <th></th>
@@ -19,6 +20,7 @@
 
                     <tbody>
                         <tr v-for="user of users.data" :key="user.id">
+                            <td>{{ user.id }}</td>
                             <td>{{ user.name }}</td>
                             <td>{{ user.email }}</td>
                             <td>
@@ -36,29 +38,29 @@
 </template>
 
 <script>
-import axios from "axios";
+    import axios from "axios";
 
-export default {
-    props: {
-        initial: { type: Object }
-    },
+    export default {
+        props: {
+            initial: { type: Object }
+        },
 
-    data() {
-        return {
-            users: {
-                data: []
+        data() {
+            return {
+                users: {
+                    data: []
+                }
+            };
+        },
+
+        created() {
+            this.users = this.initial;
+        },
+
+        methods: {
+            async fetchUsers() {
+                const response = await axios.get("/users");
             }
-        };
-    },
-
-    created() {
-        this.users = this.initial;
-    },
-
-    methods: {
-        async fetchUsers() {
-            const response = await axios.get("/users");
         }
-    }
-};
+    };
 </script>

@@ -102,7 +102,10 @@ trait BulletRoutes
             $model                = $this->getModelFromController($controller);
             $modelObj             = new $model();
             $implementsSoftDelete = method_exists($modelObj, 'initializeSoftDeletes');
-            // falta só resolver o soft deletes com only e except.
+
+            return $implementsSoftDelete && $only->isEmpty() && $except->isEmpty()
+                || ($implementsSoftDelete && $only->isNotEmpty() && $only->contains($action))
+                || ($implementsSoftDelete && $only->isEmpty() && !$except->contains($action));
         }
 
         if ($only->isNotEmpty()) {
@@ -138,6 +141,8 @@ trait BulletRoutes
                 return "$defaultRoute/{" . $modelInVariableFormat . '}/force-delete';
             case 'restore':
                 return "$defaultRoute/{" . $modelInVariableFormat . '}/restore';
+            case 'edit':
+                return "$defaultRoute/{" . $modelInVariableFormat . '}/edit';
             case 'store':
                 return "$defaultRoute";
             default:
@@ -175,7 +180,17 @@ trait BulletRoutes
 
     private function inferHttpMethodFromActionName(string $method)
     {
-        $resourceMethods = collect(['index', 'store', 'update', 'show', 'destroy', 'forceDelete', 'restore']);
+        $resourceMethods = collect([
+            'index',
+            'store',
+            'update',
+            'show',
+            'create',
+            'edit',
+            'destroy',
+            'forceDelete',
+            'restore',
+        ]);
 
         if ($resourceMethods->contains($method)) {
             return $this->getResourceHttpMethodFrom($method);
@@ -199,14 +214,15 @@ trait BulletRoutes
     {
         switch ($method) {
             case 'index':
+            case 'show':
+            case 'edit':
+            case 'create':
                 return 'get';
             case 'store':
                 return 'post';
             case 'update':
             case 'restore':
                 return 'put';
-            case 'show':
-                return 'get';
             case 'destroy':
             case 'forceDelete':
                 return 'delete';

@@ -7,7 +7,6 @@ use Spatie\QueryBuilder\Filter;
 
 class UserController extends BulletController
 {
-    protected $middleware      = ['auth:api'];
     protected $defaultSorts    = '-created_at';
     protected $allowedIncludes = ['posts.owner'];
     protected $allowedAppends  = 'posts_count';

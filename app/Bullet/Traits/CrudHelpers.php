@@ -56,7 +56,7 @@ trait CrudHelpers
         return $query;
     }
 
-    protected function hasMethod($method)
+    protected function modelHasMethod($method)
     {
         $model = $this->getModel();
         $model = new $model();
@@ -69,9 +69,14 @@ trait CrudHelpers
         return Str::slug(Str::plural(class_basename($this->getModel())));
     }
 
-    protected function getModelVariableName()
+    protected function getPluralModelVariableName()
     {
         return Str::camel(Str::plural(class_basename($this->getModel())));
+    }
+
+    protected function getSingularModelVariableName()
+    {
+        return Str::camel(Str::singular(class_basename($this->getModel())));
     }
 
     protected function getModelResource()

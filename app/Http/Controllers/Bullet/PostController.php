@@ -7,10 +7,8 @@ use Spatie\QueryBuilder\Filter;
 
 class PostController extends BulletController
 {
-    protected $middleware      = ['auth:api'];
     protected $defaultSorts    = 'title';
     protected $allowedIncludes = ['owner'];
-    protected $except          = ['store', 'restore'];
 
     protected function allowedFilters()
     {

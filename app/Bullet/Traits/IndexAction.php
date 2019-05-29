@@ -37,7 +37,7 @@ trait IndexAction
         }
 
         return view($this->getModelUrl() . '.index', [
-            $this->getModelVariableName() => $this->getModelResource()::collection($collection)
+            $this->getPluralModelVariableName() => $this->getModelResource()::collection($collection)
                 ->toResponse($request)->getData(true),
         ]);
     }
@@ -55,7 +55,7 @@ trait IndexAction
     {
         $query = $this->getFilteredQuery($request);
 
-        if ($this->searchable && $this->hasMethod('scopeSearch')) {
+        if ($this->searchable && $this->modelHasMethod('scopeSearch')) {
             $query->search($request->search);
         }
 
